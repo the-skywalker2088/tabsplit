@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<title>TabSplit — Split bills fairly</title>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="TabSplit"/>
+<meta name="theme-color" content="#0f0f13"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;TabSplit&quot;,&quot;short_name&quot;:&quot;TabSplit&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;%230f0f13&quot;,&quot;theme_color&quot;:&quot;%230f0f13&quot;}"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#0f0f13;color:#f0ede8;font-family:'DM Sans',sans-serif;min-height:100vh;padding:24px 16px}
+.card{background:#1a1a22;border-radius:20px;padding:28px;max-width:520px;margin:0 auto}
+.title{font-size:26px;font-weight:800;letter-spacing:-0.5px;margin-bottom:4px;background:linear-gradient(135deg,#ff9f43,#ff6b6b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.sub{font-size:13px;color:#888;margin-bottom:28px}
+.step-dots{display:flex;gap:6px;margin-bottom:28px}
+.dot{width:8px;height:8px;border-radius:50%;background:#333;transition:background 0.3s}
+.dot.done{background:#ff9f43}
+.error-box{background:#ff6b6b22;border:1px solid #ff6b6b44;border-radius:10px;padding:12px 14px;font-size:13px;color:#ff6b6b;margin-bottom:16px;word-break:break-word;display:none}
+.btn{background:linear-gradient(135deg,#ff9f43,#ff6b6b);border:none;border-radius:12px;padding:14px 28px;color:#fff;font-weight:700;font-size:15px;cursor:pointer;width:100%;margin-top:16px;font-family:inherit}
+.btn:disabled{opacity:0.5;cursor:not-allowed}
+.btn-ghost{background:#1a1a22;border:1px solid #333;border-radius:12px;padding:14px 28px;color:#ccc;font-weight:700;font-size:15px;cursor:pointer;width:100%;margin-top:12px;font-family:inherit}
+.btn-outline{background:transparent;border:1px solid #333;border-radius:12px;padding:10px 20px;color:#ccc;font-weight:600;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-sm{background:transparent;border:1px solid #333;border-radius:8px;padding:6px 12px;color:#888;font-size:12px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.btn-sm:hover{border-color:#555;color:#ccc}
+.btn-sm.danger{border-color:#ff6b6b44;color:#ff6b6b}
+.label{font-size:12px;color:#666;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.8px;display:block}
+.input{background:#13131a;border:1px solid #333;border-radius:10px;padding:10px 14px;color:#f0ede8;font-size:14px;outline:none;width:100%;font-family:inherit}
+.input:focus{border-color:#555}
+.row{display:flex;gap:8px;align-items:center}
+.tag{border-radius:20px;padding:5px 12px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.tag-remove{opacity:0.7;cursor:pointer;font-size:16px;line-height:1}
+.tags-wrap{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:24px;min-height:40px}
+.pill{border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.15s;white-space:nowrap;font-family:inherit;border:1.5px solid #333;background:transparent;color:#666}
+.pill.active{border-color:#ff9f43;background:#ff9f4322;color:#ff9f43}
+.pills-row{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.item-card{background:#13131a;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid #2a2a35}
+.item-card.unassigned{border-color:#ff6b6b33}
+.item-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.item-name{font-weight:600;font-size:14px;color:#f0ede8}
+.item-amt{font-size:13px;color:#ff9f43;font-weight:700;white-space:nowrap;margin-left:8px}
+.assign-pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.items-scroll{max-height:380px;overflow-y:auto;padding-right:4px}
+.result-row{background:#13131a;border-radius:14px;padding:16px 18px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+.result-name{font-weight:700;font-size:15px}
+.result-breakdown{font-size:11px;color:#555;margin-top:3px}
+.result-amount{font-size:24px;font-weight:800}
+.splitwise-box{background:#13131a;border-radius:14px;padding:14px 16px;margin-top:16px;font-size:13px;color:#666;line-height:1.8;white-space:pre-line}
+.copy-btn{background:#1a1a22;border:1px solid #333;border-radius:12px;padding:12px 20px;color:#ccc;font-weight:600;font-size:13px;cursor:pointer;width:100%;margin-top:10px;transition:all 0.2s;font-family:inherit}
+.copy-btn.copied{background:#4ECDC4;color:#fff;border-color:#4ECDC4}
+.hint{font-size:12px;color:#666;text-align:center;margin-top:8px}
+.success-note{font-size:13px;color:#4ECDC4;margin-bottom:16px}
+.auto-note{font-size:12px;color:#4ECDC4;margin-bottom:8px;display:none}
+.section-gap{margin-top:8px}
+.divider{border:none;border-top:1px solid #2a2a35;margin:20px 0}
+.change-key{font-size:12px;color:#555;text-align:center;margin-top:16px;cursor:pointer}
+.change-key:hover{color:#888}
+
+/* Mode select cards */
+.mode-grid{display:flex;flex-direction:column;gap:10px;margin-bottom:24px}
+.mode-card{background:#13131a;border:1.5px solid #2a2a35;border-radius:14px;padding:16px 18px;cursor:pointer;transition:all 0.15s}
+.mode-card:hover{border-color:#444}
+.mode-card.selected{border-color:#ff9f43;background:#ff9f4311}
+.mode-card-title{font-weight:700;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.mode-card-sub{font-size:12px;color:#666;line-height:1.5}
+
+/* Receipt tabs */
+.receipt-tabs{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.receipt-tab{background:#13131a;border:1px solid #2a2a35;border-radius:10px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:#888;font-family:inherit;white-space:nowrap;position:relative}
+.receipt-tab.active{border-color:#ff9f43;color:#ff9f43;background:#ff9f4311}
+.receipt-tab .tab-done{display:inline-block;width:6px;height:6px;border-radius:50%;background:#4ECDC4;margin-left:6px;vertical-align:middle}
+.add-receipt-btn{background:transparent;border:1px dashed #333;border-radius:10px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;color:#555;font-family:inherit;white-space:nowrap}
+.add-receipt-btn:hover{border-color:#555;color:#888}
+
+/* Receipt summary card */
+.receipt-summary{background:#13131a;border-radius:14px;padding:14px 16px;margin-bottom:10px;border:1px solid #2a2a35}
+.receipt-summary-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.receipt-summary-name{font-weight:700;font-size:14px}
+.receipt-summary-total{font-size:14px;color:#ff9f43;font-weight:700}
+.receipt-summary-sub{font-size:12px;color:#555}
+
+/* Grand total section */
+.grand-total-box{background:#ff9f4311;border:1px solid #ff9f4344;border-radius:14px;padding:16px 18px;margin-bottom:16px}
+.grand-total-label{font-size:12px;color:#ff9f43;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:4px}
+.grand-total-amount{font-size:28px;font-weight:800;color:#ff9f43}
+
+/* Modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:100;padding:24px}
+.modal-overlay.show{display:flex}
+.modal{background:#1a1a22;border-radius:20px;padding:28px;max-width:460px;width:100%}
+.modal h2{font-size:20px;font-weight:800;margin-bottom:12px;background:linear-gradient(135deg,#ff9f43,#ff6b6b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.modal p{font-size:13px;color:#888;margin-bottom:16px;line-height:1.7}
+.modal a{color:#ff9f43;text-decoration:none}
+.modal-note{font-size:12px;color:#4ECDC4;margin-top:12px;line-height:1.5}
+
+.install-banner{display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a22;border:1px solid #333;border-radius:16px;padding:14px 20px;max-width:480px;width:calc(100% - 40px);z-index:50;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;box-shadow:0 8px 32px rgba(0,0,0,0.5)}
+.install-btn{background:linear-gradient(135deg,#ff9f43,#ff6b6b);border:none;border-radius:10px;padding:10px 16px;color:#fff;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="install-banner" id="installBanner">
+  <div style="font-size:13px;color:#ccc;line-height:1.4"><strong style="color:#f0ede8">Add TabSplit to home screen</strong><br/>Works like a real app</div>
+  <button class="install-btn" onclick="installApp()">Install</button>
+</div>
+
+<!-- API Key Modal -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2>🔑 One-time setup</h2>
+    <p>TabSplit uses Google Gemini AI to read receipts. You need a <strong style="color:#f0ede8">free</strong> Gemini API key — no credit card required.<br><br>
+      <strong style="color:#f0ede8">Get your free key (2 min):</strong><br>
+      1. Go to <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a><br>
+      2. Sign in with Google → click <strong style="color:#f0ede8">Create API Key</strong><br>
+      3. Copy and paste it below
+    </p>
+    <input class="input" type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="off"/>
+    <button class="btn" onclick="saveApiKey()">Save & Start</button>
+    <p class="modal-note">✅ 100% free · Saved only in your browser · Never shared</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="title">TabSplit</div>
+  <div class="sub">Split bills fairly — single receipt or full trip.</div>
+
+  <div class="step-dots" id="stepDots">
+    <div class="dot" id="dot0"></div>
+    <div class="dot" id="dot1"></div>
+    <div class="dot" id="dot2"></div>
+    <div class="dot" id="dot3"></div>
+  </div>
+
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- STEP 0: MODE SELECT -->
+  <div id="stepMode">
+    <label class="label" style="margin-bottom:12px">What are you splitting?</label>
+    <div class="mode-grid">
+      <div class="mode-card" id="modeCardSingle" onclick="selectMode('single')">
+        <div class="mode-card-title">🧾 Single receipt</div>
+        <div class="mode-card-sub">One bill, split among friends</div>
+      </div>
+      <div class="mode-card" id="modeCardPooled" onclick="selectMode('pooled')">
+        <div class="mode-card-title">🗂️ Multiple receipts — pooled</div>
+        <div class="mode-card-sub">Scan several receipts, all items combined into one split</div>
+      </div>
+      <div class="mode-card" id="modeCardTracked" onclick="selectMode('tracked')">
+        <div class="mode-card-title">📊 Multiple receipts — tracked</div>
+        <div class="mode-card-sub">Each receipt split separately, final summary shows total owed per person</div>
+      </div>
+    </div>
+    <button class="btn" id="modeNextBtn" onclick="goFromMode()" disabled>Next →</button>
+  </div>
+
+  <!-- STEP 1: PEOPLE -->
+  <div id="stepPeople" style="display:none">
+    <div class="success-note" id="modeLabel"></div>
+    <label class="label">Who's in the group?</label>
+    <div class="row" style="margin-bottom:12px">
+      <input class="input" id="personInput" placeholder="Add a name..." onkeydown="if(event.key==='Enter')addPerson()"/>
+      <button class="btn-outline" onclick="addPerson()">+ Add</button>
+    </div>
+    <div class="tags-wrap" id="peopleTags"></div>
+    <button class="btn" id="toPeopleNextBtn" onclick="goFromPeople()" disabled>Next →</button>
+    <div class="hint" id="peopleHint">Add at least 2 people</div>
+  </div>
+
+  <!-- STEP 2: RECEIPTS -->
+  <div id="stepReceipts" style="display:none">
+    <!-- Receipt tabs (multi mode only) -->
+    <div id="receiptTabsWrap" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="receipt-tabs" id="receiptTabs"></div>
+        <button class="add-receipt-btn" onclick="addReceipt()">+ Add receipt</button>
+      </div>
+    </div>
+
+    <!-- Per-receipt upload + scan UI -->
+    <div id="receiptUploadUI">
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px" id="receiptUploadLabel">Upload receipt</div>
+      <div style="border:2px dashed #333;border-radius:16px;padding:32px 20px;text-align:center;cursor:pointer;background:#13131a" id="dropzone"
+        onclick="document.getElementById('fileInput').click()"
+        ondragover="event.preventDefault()" ondrop="handleDrop(event)">
+        <div id="dropzonePlaceholder">
+          <div style="font-size:36px;margin-bottom:10px">🧾</div>
+          <div style="font-weight:600;margin-bottom:4px">Tap to upload receipt photo</div>
+          <div style="font-size:13px;color:#666">HEIC · JPG · PNG</div>
+        </div>
+        <img id="previewImg" style="display:none;max-height:200px;border-radius:10px;object-fit:contain;display:none;margin:0 auto" alt="receipt"/>
+      </div>
+      <input type="file" id="fileInput" accept="image/*,image/heic,image/heif" style="display:none" onchange="handleFileSelect(event)"/>
+      <button class="btn" id="scanBtn" style="display:none" onclick="scanReceipt()">Scan Receipt →</button>
+      <button class="btn-ghost" id="changePhotoBtn" style="display:none" onclick="clearCurrentPhoto()">Choose different photo</button>
+    </div>
+
+    <!-- Scanned items for current receipt -->
+    <div id="receiptItemsUI" style="display:none">
+      <hr class="divider"/>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600" id="itemsFoundNote"></div>
+        <button class="btn-sm danger" onclick="clearCurrentReceipt()">Clear</button>
+      </div>
+
+      <!-- Assign items -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:13px;font-weight:600">Assign items</div>
+        <div class="unassigned-badge" id="unassignedBadge" style="display:none;font-size:12px;background:#ff6b6b22;color:#ff6b6b;border-radius:20px;padding:3px 10px"></div>
+      </div>
+      <div class="items-scroll" id="itemsList"></div>
+
+      <!-- Tip + Tax -->
+      <hr class="divider"/>
+      <label class="label">Tax %  <span style="color:#555;font-size:11px;text-transform:none;letter-spacing:0">(applied to each person's food share)</span></label>
+      <div class="auto-note" id="taxNote">✓ Calculated from receipt — edit if needed</div>
+      <div class="row" style="margin-bottom:16px">
+        <input class="input" type="number" id="taxPctInput" placeholder="0.00" style="width:100px"/>
+        <span style="font-size:13px;color:#888">%</span>
+      </div>
+      <label class="label">Tip paid <span style="color:#555;font-size:11px;text-transform:none;letter-spacing:0">(exact $ from receipt — split equally)</span></label>
+      <div class="row" style="margin-bottom:16px">
+        <span style="font-size:13px;color:#888">$</span>
+        <input class="input" type="number" id="tipDollarInput" placeholder="0.00" oninput="updateSaveBtn()"/>
+      <div id="tipHint" style="display:none;font-size:12px;color:#ff9f43;margin-top:6px">⚠️ Please enter tip amount — use $0 if no tip was paid</div>
+      </div>
+
+      <!-- Receipt label -->
+      <label class="label">Receipt name <span style="color:#555;font-size:11px;text-transform:none">(optional)</span></label>
+      <input class="input" id="receiptNameInput" placeholder="e.g. Dinner, Hotel, Lunch..." style="margin-bottom:16px"/>
+
+      <button class="btn" id="saveReceiptBtn" onclick="saveCurrentReceipt()">
+        Save Receipt ✓
+      </button>
+    </div>
+
+    <!-- Saved receipts summary (multi mode) -->
+    <div id="savedReceiptsSummary" style="display:none">
+      <hr class="divider"/>
+      <div style="font-size:13px;font-weight:600;margin-bottom:12px">Saved receipts</div>
+      <div id="savedReceiptsList"></div>
+    </div>
+
+    <div id="toResultWrap" style="display:none">
+      <button class="btn" onclick="calculateAll()">Calculate Split →</button>
+    </div>
+
+    <div class="change-key" onclick="showApiModal()" style="margin-top:20px">🔑 Change API key</div>
+    <div id="iosHint" style="display:none;font-size:12px;color:#555;text-align:center;margin-top:10px;line-height:1.5">
+      📱 <strong style="color:#888">Add to Home Screen:</strong> tap Share in Safari → "Add to Home Screen"
+    </div>
+  </div>
+
+  <!-- STEP 3: RESULT -->
+  <div id="stepResult" style="display:none">
+    <div style="font-size:14px;font-weight:600;margin-bottom:16px" id="resultTitle">Final Split</div>
+
+    <!-- Grand total (multi mode) -->
+    <div id="grandTotalBox" style="display:none" class="grand-total-box">
+      <div class="grand-total-label">Grand Total</div>
+      <div class="grand-total-amount" id="grandTotalAmt"></div>
+    </div>
+
+    <!-- Per-person totals -->
+    <div id="resultRows"></div>
+
+    <!-- Per-receipt breakdown (tracked mode) -->
+    <div id="receiptBreakdowns"></div>
+
+    <div class="splitwise-box" id="splitwiseBox"></div>
+    <button class="copy-btn" id="copyBtn" onclick="copyToClipboard()">📋 Copy for Splitwise</button>
+    <button class="btn-ghost" onclick="resetAll()">↩ Start Over</button>
+  </div>
+</div>
+
+<script>
+const COLORS = ["#FF6B6B","#4ECDC4","#FFE66D","#A8E6CF","#C3A6FF","#FFB347","#87CEEB","#F0A0A0"];
+const STORAGE_KEY = "tabsplit_gemini_key";
+
+// ── STATE ────────────────────────────────────────────────────────────────────
+let state = {
+  mode: null,           // 'single' | 'pooled' | 'tracked'
+  step: "mode",
+  people: [],
+  receipts: [],         // array of receipt objects
+  currentReceiptIdx: 0, // which receipt we're editing
+  currentBase64: null,
+  splits: []
+};
+let currentTipPercent = 18;
+
+// Receipt object shape:
+// { id, name, items, assignments, tax, tipMode, tipPercent, tipDollar, splits }
+
+// ── API KEY ──────────────────────────────────────────────────────────────────
+function getApiKey(){ return localStorage.getItem(STORAGE_KEY)||""; }
+function showApiModal(){ document.getElementById("apiModal").classList.add("show"); }
+function hideApiModal(){ document.getElementById("apiModal").classList.remove("show"); }
+function saveApiKey(){
+  const k = document.getElementById("apiKeyInput").value.trim();
+  if(!k||k.length<10){ showError("Please enter a valid API key"); return; }
+  localStorage.setItem(STORAGE_KEY,k);
+  hideApiModal();
+  if(state.currentBase64) scanReceipt();
+}
+function requireApiKey(){ if(!getApiKey()){ showApiModal(); return false; } return true; }
+
+// ── IMAGE ────────────────────────────────────────────────────────────────────
+function toJpegBase64(file){
+  return new Promise((res,rej)=>{
+    const url=URL.createObjectURL(file);
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const c=document.createElement("canvas");
+        c.width=img.naturalWidth; c.height=img.naturalHeight;
+        c.getContext("2d").drawImage(img,0,0);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL("image/jpeg",0.92).split(",")[1]);
+      }catch(e){rej(e);}
+    };
+    img.onerror=()=>{
+      URL.revokeObjectURL(url);
+      const r=new FileReader();
+      r.onload=()=>res(r.result.split(",")[1]);
+      r.onerror=()=>rej(new Error("Could not read image"));
+      r.readAsDataURL(file);
+    };
+    img.src=url;
+  });
+}
+
+async function handleFileSelect(e){
+  const file=e.target.files[0]; if(!file)return;
+  clearError();
+  const url=URL.createObjectURL(file);
+  document.getElementById("dropzonePlaceholder").style.display="none";
+  const pi=document.getElementById("previewImg");
+  pi.src=url; pi.style.display="block";
+  const sb=document.getElementById("scanBtn");
+  sb.style.display="block"; sb.textContent="Processing..."; sb.disabled=true;
+  document.getElementById("changePhotoBtn").style.display="block";
+  try{
+    state.currentBase64=await toJpegBase64(file);
+    sb.textContent="Scan Receipt →"; sb.disabled=false;
+  }catch(e){ showError("Could not process image: "+e.message); }
+}
+function handleDrop(e){ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) handleFileSelect({target:{files:e.dataTransfer.files}}); }
+
+// ── GEMINI SCAN ──────────────────────────────────────────────────────────────
+async function scanReceipt(){
+  if(!state.currentBase64){ showError("Image not ready yet."); return; }
+  if(!requireApiKey()) return;
+  const btn=document.getElementById("scanBtn");
+  btn.textContent="⏳ Reading..."; btn.disabled=true;
+  clearError();
+  const prompt=`This is a restaurant receipt photo. Extract all food/drink line items AND the tax amount.
+Rules: ignore subtotal/total/tip/service charge/table/date/server rows. Fold modifier adjustments into parent item net amount. Use readable names. Estimate unclear prices.
+Return ONLY raw JSON with no special characters in names, no apostrophes, no newlines inside strings: {"tax":12.34,"items":[{"name":"Item Name","amount":12.50,"quantity":1}]}
+IMPORTANT: amount must always be the TOTAL price for that line (unit price x quantity). quantity is for display only. If tax missing use 0. If no items: {"tax":0,"items":[]}. Use simple ASCII names only.`;
+  try{
+    const resp=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${getApiKey()}`,{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        contents:[{parts:[
+          {inline_data:{mime_type:"image/jpeg",data:state.currentBase64}},
+          {text:prompt}
+        ]}],
+        generationConfig:{maxOutputTokens:1500,temperature:0.1}
+      })
+    });
+    if(!resp.ok){
+      const t=await resp.text();
+      if(resp.status===400||resp.status===403){ localStorage.removeItem(STORAGE_KEY); showApiModal(); throw new Error("Invalid API key — please re-enter."); }
+      throw new Error(`API ${resp.status}: ${t.slice(0,200)}`);
+    }
+    const data=await resp.json();
+    if(data.error) throw new Error(data.error.message);
+    const raw=data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if(!raw) throw new Error("No text in response");
+    const m=raw.match(/[{\[][^]*[}\]]/);
+    if(!m) throw new Error("Could not parse receipt data");
+    // Clean common JSON issues: smart quotes, line breaks inside strings, trailing commas
+    const cleaned=m[0]
+      .replace(/[\u2018\u2019]/g,"'")
+      .replace(/[\u201C\u201D]/g,'"')
+      .replace(/,\s*([}\]])/g,'$1')
+      .replace(/([^\\])\n/g,'$1 ')
+      .replace(/\t/g,' ');
+    let parsed;
+    try { parsed=JSON.parse(cleaned); }
+    catch(e) {
+      throw new Error("Receipt scanned but couldn't parse the data. Please try again.");
+    }
+    let tax=0,items=[];
+    if(Array.isArray(parsed)){items=parsed;}
+    else if(parsed.items){tax=parsed.tax||0;items=parsed.items;}
+    else throw new Error("Unexpected response structure");
+    if(!items.length) throw new Error("No items detected — try a clearer photo");
+
+    // Load into current receipt
+    const r=currentReceipt();
+    r.items=items.map((it,i)=>({...it,id:i}));
+    r.assignments={};
+    r.tax=tax;
+    const subtotalForTax=items.reduce((a,it)=>a+Number(it.amount),0);
+    if(tax>0&&subtotalForTax>0){
+      const taxPct=((tax/subtotalForTax)*100);
+      document.getElementById("taxPctInput").value=taxPct.toFixed(2);
+      document.getElementById("taxNote").style.display="block";
+    } else {
+      document.getElementById("taxPctInput").value="";
+      document.getElementById("taxNote").style.display="none";
+    }
+    document.getElementById("tipDollarInput").value="";
+
+    document.getElementById("itemsFoundNote").textContent=`✓ Found ${items.length} items`;
+    document.getElementById("receiptItemsUI").style.display="block";
+    renderItemsList();
+    updateSaveBtn();
+
+  }catch(e){
+    showError("Scan failed: "+e.message);
+    btn.textContent="Scan Receipt →"; btn.disabled=false;
+  }
+}
+
+// ── RECEIPT MANAGEMENT ───────────────────────────────────────────────────────
+function currentReceipt(){ return state.receipts[state.currentReceiptIdx]; }
+
+function addReceipt(){
+  const idx=state.receipts.length;
+  state.receipts.push({id:idx,name:"Receipt "+(idx+1),items:[],assignments:{},tax:0,tipMode:"percent",tipPercent:18,tipDollar:0,splits:[]});
+  state.currentReceiptIdx=idx;
+  renderReceiptTabs();
+  switchToReceipt(idx);
+}
+
+function switchToReceipt(idx){
+  state.currentReceiptIdx=idx;
+  state.currentBase64=null;
+  const r=state.receipts[idx];
+  // Reset upload UI
+  document.getElementById("dropzonePlaceholder").style.display="block";
+  const pi=document.getElementById("previewImg"); pi.style.display="none"; pi.src="";
+  document.getElementById("scanBtn").style.display="none";
+  document.getElementById("changePhotoBtn").style.display="none";
+  document.getElementById("fileInput").value="";
+  document.getElementById("receiptItemsUI").style.display=r.items.length?"block":"none";
+  document.getElementById("receiptUploadLabel").textContent=`Receipt ${idx+1}${r.name&&r.name!=="Receipt "+(idx+1)?" — "+r.name:""}`;
+
+  if(r.items.length){
+    document.getElementById("itemsFoundNote").textContent=`✓ ${r.items.length} items`;
+    document.getElementById("taxInput").value=r.tax>0?r.tax.toFixed(2):"";
+    document.getElementById("taxNote").style.display=r.tax>0?"block":"none";
+    document.getElementById("tipDollarInput").value=r.tipDollar||"";
+    document.getElementById("taxPctInput").value=r.taxPct||"";
+    document.getElementById("taxNote").style.display=r.taxPct>0?"block":"none";
+    document.getElementById("receiptNameInput").value=r.name||"";
+    renderItemsList();
+    updateSaveBtn();
+  }
+  renderReceiptTabs();
+}
+
+function clearCurrentPhoto(){
+  state.currentBase64=null;
+  document.getElementById("dropzonePlaceholder").style.display="block";
+  const pi=document.getElementById("previewImg"); pi.style.display="none"; pi.src="";
+  document.getElementById("scanBtn").style.display="none";
+  document.getElementById("changePhotoBtn").style.display="none";
+  document.getElementById("fileInput").value="";
+  const r=currentReceipt();
+  if(!r.items.length) document.getElementById("receiptItemsUI").style.display="none";
+}
+
+function clearCurrentReceipt(){
+  const r=currentReceipt();
+  r.items=[]; r.assignments={}; r.taxPct=0; r.tipDollar=0;
+  document.getElementById("taxPctInput").value="";
+  document.getElementById("tipDollarInput").value="";
+  document.getElementById("taxNote").style.display="none";
+  document.getElementById("receiptItemsUI").style.display="none";
+  clearCurrentPhoto();
+  renderReceiptTabs();
+  updateToResultBtn();
+}
+
+function saveCurrentReceipt(){
+  const r=currentReceipt();
+  const tipVal=document.getElementById("tipDollarInput").value.trim();
+  if(tipVal===""){
+    showError("Please enter the tip amount. Enter $0 if no tip was paid.");
+    document.getElementById("tipDollarInput").focus();
+    return;
+  }
+  r.tipDollar=parseFloat(tipVal)||0;
+  r.taxPct=parseFloat(document.getElementById("taxPctInput").value)||0;
+  const nameVal=document.getElementById("receiptNameInput").value.trim();
+  r.name=nameVal||(r.id===0&&state.receipts.length===1?"Receipt":"Receipt "+(r.id+1));
+  // Calculate splits for this receipt
+  r.splits=calcReceiptSplit(r);
+  renderReceiptTabs();
+  renderSavedReceiptsSummary();
+  updateToResultBtn();
+  showError(""); // clear errors
+  // Show green confirmation
+  const btn=document.getElementById("saveReceiptBtn");
+  const orig=btn.textContent; btn.textContent="✓ Saved!"; btn.style.background="#4ECDC4";
+  setTimeout(()=>{ btn.textContent=orig; btn.style.background=""; },1500);
+}
+
+function calcReceiptSplit(r){
+  const subtotal=r.items.reduce((a,it)=>a+Number(it.amount),0);
+  const taxPct=(r.taxPct||0)/100;
+  const tipTotal=r.tipDollar||0;
+  const tipPerPerson=state.people.length>0?tipTotal/state.people.length:0;
+  const totals={};
+  state.people.forEach(p=>{ totals[p]=0; });
+  r.items.forEach(item=>{
+    const assigned=r.assignments[item.id]||[];
+    if(!assigned.length)return;
+    const share=Number(item.amount)/assigned.length;
+    assigned.forEach(p=>{ totals[p]+=share; });
+  });
+  return state.people.map((p,i)=>{
+    const food=totals[p];
+    const taxShare=food*taxPct;
+    const subtotalShare=food+taxShare;
+    return {
+      name:p,
+      raw:food,
+      taxShare,
+      subtotalShare,
+      tipShare:tipPerPerson,
+      final:subtotalShare+tipPerPerson,
+      color:COLORS[i%COLORS.length]
+    };
+  });
+}
+
+function renderReceiptTabs(){
+  if(state.mode==="single") return;
+  const tabs=document.getElementById("receiptTabs");
+  tabs.innerHTML="";
+  state.receipts.forEach((r,i)=>{
+    const t=document.createElement("button");
+    t.className="receipt-tab"+(i===state.currentReceiptIdx?" active":"");
+    const done=r.splits&&r.splits.length>0;
+    t.innerHTML=`${r.name||"Receipt "+(i+1)}${done?'<span class="tab-done"></span>':""}`;
+    t.onclick=()=>switchToReceipt(i);
+    tabs.appendChild(t);
+  });
+}
+
+function renderSavedReceiptsSummary(){
+  const saved=state.receipts.filter(r=>r.splits&&r.splits.length>0);
+  const wrap=document.getElementById("savedReceiptsSummary");
+  const list=document.getElementById("savedReceiptsList");
+  if(!saved.length){ wrap.style.display="none"; return; }
+  wrap.style.display="block";
+  list.innerHTML="";
+  saved.forEach(r=>{
+    const total=r.splits.reduce((a,s)=>a+s.final,0);
+    const d=document.createElement("div");
+    d.className="receipt-summary";
+    d.innerHTML=`<div class="receipt-summary-header">
+      <div class="receipt-summary-name">${r.name}</div>
+      <div class="receipt-summary-total">$${total.toFixed(2)}</div>
+    </div>
+    <div class="receipt-summary-sub">${r.items.length} items · tax ${(r.taxPct||0).toFixed(1)}% · tip $${(r.tipDollar||0).toFixed(2)}</div>`;
+    list.appendChild(d);
+  });
+}
+
+function updateToResultBtn(){
+  const saved=state.receipts.filter(r=>r.splits&&r.splits.length>0);
+  const wrap=document.getElementById("toResultWrap");
+  wrap.style.display=saved.length>0?"block":"none";
+}
+
+// ── PEOPLE ───────────────────────────────────────────────────────────────────
+function addPerson(){
+  const inp=document.getElementById("personInput");
+  const name=inp.value.trim();
+  if(!name||state.people.includes(name))return;
+  state.people.push(name);
+  inp.value="";
+  renderPeopleTags();
+  updatePeopleBtn();
+}
+function removePerson(name){
+  state.people=state.people.filter(p=>p!==name);
+  renderPeopleTags(); updatePeopleBtn();
+}
+function renderPeopleTags(){
+  const w=document.getElementById("peopleTags"); w.innerHTML="";
+  state.people.forEach((p,i)=>{
+    const c=COLORS[i%COLORS.length];
+    const t=document.createElement("span");
+    t.className="tag";
+    t.style.cssText=`background:${c}22;border:1px solid ${c}55;color:${c}`;
+    t.innerHTML=`${p} <span class="tag-remove" onclick="removePerson('${p.replace(/'/g,"\\'")}')">×</span>`;
+    w.appendChild(t);
+  });
+}
+function updatePeopleBtn(){
+  const btn=document.getElementById("toPeopleNextBtn");
+  const hint=document.getElementById("peopleHint");
+  btn.disabled=state.people.length<2;
+  hint.style.display=state.people.length<2?"block":"none";
+}
+
+// ── TIP ──────────────────────────────────────────────────────────────────────
+// tip is always a dollar amount entered directly from the receipt
+
+// ── ASSIGN ───────────────────────────────────────────────────────────────────
+function renderItemsList(){
+  const r=currentReceipt();
+  const list=document.getElementById("itemsList"); list.innerHTML="";
+  r.items.forEach(item=>{
+    const assigned=r.assignments[item.id]||[];
+    const card=document.createElement("div");
+    card.className="item-card"+(assigned.length?"":" unassigned");
+    card.innerHTML=`<div class="item-header">
+      <div class="item-name">${item.name}${item.quantity>1?` ×${item.quantity}`:""}</div>
+      <div class="item-amt">$${Number(item.amount).toFixed(2)}</div>
+    </div>`;
+    const pw=document.createElement("div"); pw.className="assign-pills";
+    state.people.forEach((p,i)=>{
+      const c=COLORS[i%COLORS.length];
+      const b=document.createElement("button"); b.className="pill"+(assigned.includes(p)?" active":"");
+      if(assigned.includes(p)){b.style.borderColor=c;b.style.background=c+"22";b.style.color=c;}
+      b.textContent=p;
+      b.onclick=()=>toggleAssign(item.id,p);
+      pw.appendChild(b);
+    });
+    const ab=document.createElement("button"); ab.className="pill"+(assigned.length===state.people.length?" active":"");
+    ab.style.fontSize="11px"; ab.textContent="All";
+    if(assigned.length===state.people.length){ab.style.borderColor="#888";ab.style.background="#88888822";ab.style.color="#888";}
+    ab.onclick=()=>{ currentReceipt().assignments[item.id]=[...state.people]; renderItemsList(); updateSaveBtn(); };
+    pw.appendChild(ab);
+    card.appendChild(pw);
+    list.appendChild(card);
+  });
+  updateSaveBtn();
+}
+
+function toggleAssign(itemId,person){
+  const r=currentReceipt();
+  const cur=r.assignments[itemId]||[];
+  r.assignments[itemId]=cur.includes(person)?cur.filter(p=>p!==person):[...cur,person];
+  renderItemsList(); updateSaveBtn();
+}
+
+function updateSaveBtn(){
+  const r=currentReceipt();
+  const unassigned=r.items.filter(it=>!(r.assignments[it.id]?.length)).length;
+  const tipVal=document.getElementById("tipDollarInput").value;
+  const tipEntered=tipVal.trim()!==""; // blank = not entered, "0" = valid $0 tip
+  const badge=document.getElementById("unassignedBadge");
+  badge.style.display=unassigned>0?"inline-block":"none";
+  if(unassigned>0) badge.textContent=unassigned+" unassigned";
+  const btn=document.getElementById("saveReceiptBtn");
+  const blocked=unassigned>0||!tipEntered;
+  btn.disabled=blocked;
+  if(unassigned>0) btn.title="Assign all items first";
+  else if(!tipEntered) btn.title="Enter tip amount (enter 0 if no tip)";
+  else btn.title="";
+  // Show tip hint if all items assigned but tip still blank
+  const tipHint=document.getElementById("tipHint");
+  if(tipHint) tipHint.style.display=(!tipEntered&&unassigned===0&&r.items.length>0)?"block":"none";
+}
+
+// ── CALCULATE ALL ────────────────────────────────────────────────────────────
+function calculateAll(){
+  const saved=state.receipts.filter(r=>r.splits&&r.splits.length>0);
+  if(!saved.length) return;
+
+  if(state.mode==="single"||state.mode==="pooled"){
+    // Merge all splits: sum final per person
+    const totals={};
+    state.people.forEach(p=>{ totals[p]={food:0,tax:0,tip:0}; });
+    saved.forEach(r=>{
+      r.splits.forEach(sp=>{
+        totals[sp.name].food+=sp.raw;
+        totals[sp.name].tax+=sp.taxShare;
+        totals[sp.name].tip+=sp.tipShare;
+      });
+    });
+    state.splits=state.people.map((p,i)=>{
+      const food=totals[p].food, tax=totals[p].tax, tip=totals[p].tip;
+      return { name:p, raw:food, taxShare:tax, subtotalShare:food+tax, tipShare:tip, final:food+tax+tip, color:COLORS[i%COLORS.length] };
+    });
+    renderResult("pooled",saved);
+  } else {
+    // Tracked: per-receipt then grand total
+    const totals={};
+    state.people.forEach(p=>{ totals[p]={food:0,tax:0,tip:0}; });
+    saved.forEach(r=>{ r.splits.forEach(sp=>{
+      totals[sp.name].food+=sp.raw||0;
+      totals[sp.name].tax+=sp.taxShare||0;
+      totals[sp.name].tip+=sp.tipShare||0;
+    }); });
+    state.splits=state.people.map((p,i)=>{
+      const food=totals[p].food, tax=totals[p].tax, tip=totals[p].tip;
+      return { name:p, raw:food, taxShare:tax, subtotalShare:food+tax, tipShare:tip, final:food+tax+tip, color:COLORS[i%COLORS.length] };
+    });
+    renderResult("tracked",saved);
+  }
+  goToStep("result");
+}
+
+function renderResult(mode,saved){
+  const grandTotal=state.splits.reduce((a,s)=>a+s.final,0);
+
+  // Title
+  document.getElementById("resultTitle").textContent=
+    mode==="tracked"?`Split across ${saved.length} receipts`:"Final Split";
+
+  // Grand total box (multi)
+  const gtBox=document.getElementById("grandTotalBox");
+  if(saved.length>1){
+    gtBox.style.display="block";
+    document.getElementById("grandTotalAmt").textContent=`$${grandTotal.toFixed(2)}`;
+  } else { gtBox.style.display="none"; }
+
+  // Per-person rows
+  const rows=document.getElementById("resultRows"); rows.innerHTML="";
+  state.splits.forEach(sp=>{
+    const row=document.createElement("div");
+    row.className="result-row"; row.style.borderLeft=`4px solid ${sp.color}`;
+    if(mode==="tracked"){
+      row.innerHTML=`<div><div class="result-name">${sp.name}</div>
+        <div class="result-breakdown">food $${sp.raw.toFixed(2)} · tax $${sp.taxShare.toFixed(2)} · subtotal $${sp.subtotalShare.toFixed(2)} · tip $${sp.tipShare.toFixed(2)}</div></div>
+        <div class="result-amount" style="color:${sp.color}">$${sp.final.toFixed(2)}</div>`;
+    } else {
+      row.innerHTML=`<div><div class="result-name">${sp.name}</div>
+        <div class="result-breakdown">food $${sp.raw.toFixed(2)} · tax $${sp.taxShare.toFixed(2)} · subtotal $${sp.subtotalShare.toFixed(2)} · tip $${sp.tipShare.toFixed(2)}</div></div>
+        <div class="result-amount" style="color:${sp.color}">$${sp.final.toFixed(2)}</div>`;
+    }
+    rows.appendChild(row);
+  });
+
+  // Per-receipt breakdowns (tracked mode)
+  const breakdowns=document.getElementById("receiptBreakdowns"); breakdowns.innerHTML="";
+  if(mode==="tracked"&&saved.length>1){
+    saved.forEach(r=>{
+      const sec=document.createElement("div");
+      sec.style.marginTop="20px";
+      const rTotal=r.splits.reduce((a,s)=>a+s.final,0);
+      sec.innerHTML=`<div style="font-size:12px;color:#666;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px">${r.name} — $${rTotal.toFixed(2)}</div>`;
+      r.splits.forEach(sp=>{
+        const row=document.createElement("div");
+        row.style.cssText="display:flex;justify-content:space-between;padding:8px 12px;background:#13131a;border-radius:10px;margin-bottom:6px;font-size:13px";
+        row.innerHTML=`<span style="color:${sp.color};font-weight:600">${sp.name}</span><span style="color:#888">$${sp.final.toFixed(2)}</span>`;
+        sec.appendChild(row);
+      });
+      breakdowns.appendChild(sec);
+    });
+  }
+
+  // Splitwise text
+  let text="";
+  if(mode==="tracked"&&saved.length>1){
+    saved.forEach(r=>{
+      const rTotal=r.splits.reduce((a,s)=>a+s.final,0);
+      text+=`📍 ${r.name} — $${rTotal.toFixed(2)}\n`;
+      r.splits.forEach(sp=>{ text+=`  ${sp.name}: $${sp.final.toFixed(2)}\n`; });
+      text+="\n";
+    });
+    text+=`🧾 GRAND TOTAL: $${grandTotal.toFixed(2)}\n`;
+    state.splits.forEach(sp=>{ text+=`  ${sp.name}: $${sp.final.toFixed(2)}\n`; });
+  } else {
+    text=`🧾 Split — tax ${(saved[0].taxPct||0).toFixed(2)}% · tip $${(saved[0].tipDollar||0).toFixed(2)} (split equally)\nTotal: $${grandTotal.toFixed(2)}\n\n`;
+    state.splits.forEach(sp=>{ text+=`${sp.name}: $${sp.final.toFixed(2)}\n`; });
+  }
+  document.getElementById("splitwiseBox").textContent=text;
+}
+
+function copyToClipboard(){
+  navigator.clipboard.writeText(document.getElementById("splitwiseBox").textContent).then(()=>{
+    const btn=document.getElementById("copyBtn");
+    btn.textContent="✓ Copied!"; btn.classList.add("copied");
+    setTimeout(()=>{ btn.textContent="📋 Copy for Splitwise"; btn.classList.remove("copied"); },2000);
+  });
+}
+
+// ── NAV ──────────────────────────────────────────────────────────────────────
+function selectMode(mode){
+  state.mode=mode;
+  ["single","pooled","tracked"].forEach(m=>{
+    document.getElementById("modeCard"+m.charAt(0).toUpperCase()+m.slice(1)).classList.toggle("selected",m===mode);
+  });
+  document.getElementById("modeNextBtn").disabled=false;
+}
+
+function goFromMode(){
+  if(!state.mode)return;
+  goToStep("people");
+  const labels={"single":"Single receipt","pooled":"Multiple receipts — pooled","tracked":"Multiple receipts — tracked separately"};
+  document.getElementById("modeLabel").textContent="Mode: "+labels[state.mode];
+}
+
+function goFromPeople(){
+  if(state.people.length<2)return;
+  // Init first receipt
+  state.receipts=[{id:0,name:"Receipt 1",items:[],assignments:{},tax:0,tipMode:"percent",tipPercent:18,tipDollar:0,splits:[]}];
+  state.currentReceiptIdx=0;
+  document.getElementById("receiptTabsWrap").style.display=state.mode==="single"?"none":"block";
+  document.getElementById("toResultWrap").style.display="none";
+  document.getElementById("savedReceiptsSummary").style.display="none";
+  document.getElementById("receiptItemsUI").style.display="none";
+  document.getElementById("receiptUploadLabel").textContent="Upload receipt";
+  document.getElementById("receiptNameInput").value="";
+  renderReceiptTabs();
+  goToStep("receipts");
+}
+
+function goToStep(step){
+  state.step=step;
+  ["stepMode","stepPeople","stepReceipts","stepResult"].forEach(id=>document.getElementById(id).style.display="none");
+  const map={mode:"stepMode",people:"stepPeople",receipts:"stepReceipts",result:"stepResult"};
+  document.getElementById(map[step]).style.display="block";
+  updateDots();
+}
+
+function updateDots(){
+  const order=["mode","people","receipts","result"];
+  const idx=order.indexOf(state.step);
+  for(let i=0;i<4;i++) document.getElementById("dot"+i).classList.toggle("done",i<=idx);
+}
+
+function showError(msg){ const b=document.getElementById("errorBox"); b.textContent=msg; b.style.display=msg?"block":"none"; }
+function clearError(){ showError(""); }
+
+function resetAll(){
+  state={mode:null,step:"mode",people:[],receipts:[],currentReceiptIdx:0,currentBase64:null,splits:[]};
+  currentTipPercent=18;
+  document.getElementById("personInput").value="";
+  document.getElementById("peopleTags").innerHTML="";
+  document.getElementById("fileInput").value="";
+  document.getElementById("taxPctInput").value="";
+  document.getElementById("tipDollarInput").value="";
+  document.getElementById("taxNote").style.display="none";
+  document.getElementById("receiptItemsUI").style.display="none";
+  document.getElementById("savedReceiptsSummary").style.display="none";
+  document.getElementById("toResultWrap").style.display="none";
+  document.getElementById("receiptTabs").innerHTML="";
+  ["modeCardSingle","modeCardPooled","modeCardTracked"].forEach(id=>document.getElementById(id).classList.remove("selected"));
+  document.getElementById("modeNextBtn").disabled=true;
+  clearError();
+  goToStep("mode");
+}
+
+// ── PWA ──────────────────────────────────────────────────────────────────────
+let deferredPrompt;
+window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); deferredPrompt=e; document.getElementById("installBanner").style.display="flex"; });
+window.addEventListener("appinstalled",()=>{ document.getElementById("installBanner").style.display="none"; });
+function installApp(){ if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;} document.getElementById("installBanner").style.display="none"; }
+
+if("serviceWorker"in navigator){
+  const sw=`const C="tabsplit-v2";self.addEventListener("install",e=>{self.skipWaiting();});self.addEventListener("activate",e=>{e.waitUntil(caches.keys().then(k=>Promise.all(k.filter(n=>n!==C).map(n=>caches.delete(n)))));self.clients.claim();});self.addEventListener("fetch",e=>{e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request)));});`;
+  const blob=new Blob([sw],{type:"application/javascript"});
+  navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(()=>{});
+}
+
+// ── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener("load",()=>{
+  if(!getApiKey()) showApiModal();
+  const isIos=/iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone=window.navigator.standalone===true;
+  const isSafari=/^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  if(isIos&&isSafari&&!isStandalone) document.getElementById("iosHint").style.display="block";
+  updateDots();
+  updatePeopleBtn();
+});
+</script>
+</body>
+</html>
